@@ -1,3 +1,4 @@
+#
 # Copyright (C) 2018-2020 Ruilin Peng (Nick) <pymumu@gmail.com>.
 #
 # smartdns is free software: you can redistribute it and/or modify
@@ -12,36 +13,57 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+include $(TOPDIR)/rules.mk
 
-PKG_CONFIG := pkg-config
-DESTDIR :=
-PREFIX := /usr
-SBINDIR := $(PREFIX)/sbin
-SYSCONFDIR := /etc
-RUNSTATEDIR := /var/run
-SYSTEMDSYSTEMUNITDIR := $(shell ${PKG_CONFIG} --variable=systemdsystemunitdir systemd)
-SMARTDNS_SYSTEMD = systemd/smartdns.service
+PKG_NAME:=smartdns
+PKG_VERSION:=1.2021.24
+PKG_RELEASE:=1
 
-.PHONY: all clean install SMARTDNS_BIN
-all: SMARTDNS_BIN 
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_URL:=https://github.com/pymumu/smartdns.git
+PKG_MIRROR_HASH:=282bd4926fd33a949ba8a8a7f2a9eb83c09b540e88c782b2c739c6cb82b062a5
+PKG_SOURCE_VERSION:=11cf7b614c2ad42acf12cf4843daa1b67696763b
 
-SMARTDNS_BIN: $(SMARTDNS_SYSTEMD)
-	$(MAKE) $(MFLAGS) -C src all 
+PKG_MAINTAINER:=Nick Peng <pymumu@gmail.com>
+PKG_LICENSE:=GPL-3.0-or-later
+PKG_LICENSE_FILES:=LICENSE
 
-$(SMARTDNS_SYSTEMD): systemd/smartdns.service.in
-	cp $< $@
-	sed -i 's|@SBINDIR@|$(SBINDIR)|' $@
-	sed -i 's|@SYSCONFDIR@|$(SYSCONFDIR)|' $@
-	sed -i 's|@RUNSTATEDIR@|$(RUNSTATEDIR)|' $@
+PKG_BUILD_PARALLEL:=1
 
-clean:
-	$(MAKE) $(MFLAGS) -C src clean  
-	$(RM) $(SMARTDNS_SYSTEMD)
+include $(INCLUDE_DIR)/package.mk
 
-install: SMARTDNS_BIN 
-	install -v -m 0640 -D -t $(DESTDIR)$(SYSCONFDIR)/default etc/default/smartdns
-	install -v -m 0755 -D -t $(DESTDIR)$(SYSCONFDIR)/init.d etc/init.d/smartdns
-	install -v -m 0640 -D -t $(DESTDIR)$(SYSCONFDIR)/smartdns etc/smartdns/smartdns.conf
-	install -v -m 0755 -D -t $(DESTDIR)$(SBINDIR) src/smartdns
-	install -v -m 0644 -D -t $(DESTDIR)$(SYSTEMDSYSTEMUNITDIR) systemd/smartdns.service
+MAKE_VARS += VER=$(PKG_VERSION)
+MAKE_PATH:=src
 
+define Package/smartdns
+  SECTION:=net
+  CATEGORY:=Network
+  TITLE:=smartdns server
+  DEPENDS:=+libpthread +libopenssl
+  URL:=https://www.github.com/pymumu/smartdns/
+endef
+
+define Package/smartdns/description
+SmartDNS is a local DNS server which accepts DNS query requests from local network clients,
+gets DNS query results from multiple upstream DNS servers concurrently, and returns the fastest IP to clients.
+Unlike dnsmasq's all-servers, smartdns returns the fastest IP. 
+endef
+
+define Package/smartdns/conffiles
+/etc/config/smartdns
+/etc/smartdns/address.conf
+/etc/smartdns/blacklist-ip.conf
+/etc/smartdns/custom.conf
+endef
+
+define Package/smartdns/install
+	$(INSTALL_DIR) $(1)/usr/sbin $(1)/etc/config $(1)/etc/init.d $(1)/etc/smartdns
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/smartdns $(1)/usr/sbin/smartdns
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/package/openwrt/files/etc/init.d/smartdns $(1)/etc/init.d/smartdns
+	$(INSTALL_CONF) $(PKG_BUILD_DIR)/package/openwrt/address.conf $(1)/etc/smartdns/address.conf
+	$(INSTALL_CONF) $(PKG_BUILD_DIR)/package/openwrt/blacklist-ip.conf $(1)/etc/smartdns/blacklist-ip.conf
+	$(INSTALL_CONF) $(CURDIR)/conf/custom.conf $(1)/etc/smartdns/custom.conf
+	$(INSTALL_CONF) $(CURDIR)/conf/smartdns.conf $(1)/etc/config/smartdns
+endef
+
+$(eval $(call BuildPackage,smartdns))
